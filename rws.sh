@@ -1,0 +1,11 @@
+python run_experiments.py \
+    --task_name "word_sorting" \
+    --meta_config_path "prompts/meta-v0-2023-08-14-baseline.json" \
+    --output_directory "TEST-CHATGPT-META-PROMPTING-WITH-PYTHON" \
+    --question_prefix_or_path "prompts/meta-prompting-instruction.txt" \
+    --model_name "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+    --api_base "http://localhost:8042/v1/" \
+    --api_key "EMPTY" \
+    --temperature 0.1 \
+    --include_expert_name_in_instruction \
+    --fresh_eyes

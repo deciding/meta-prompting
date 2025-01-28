@@ -144,7 +144,8 @@ class OpenAI_LanguageModel(LanguageModel):
             # Skipping model name validation for now
             # Set up the client
             self.client = OpenAI(
-                api_key=os.environ.get("OPENAI_API_KEY"),
+                api_key=os.environ.get("OPENAI_API_KEY") or self.api_key,
+                base_url=self.api_base,
             )
 
     @retry.retry(tries=3, delay=1)
@@ -176,7 +177,7 @@ class OpenAI_LanguageModel(LanguageModel):
         # Set the stop tokens
         stop_tokens = stop_tokens or self.stop_tokens
 
-        print(f"Calling the language model with prompt: {prompt_or_messages}")
+        #print(f"Calling the language model with prompt: {prompt_or_messages}")
 
         if self.api_type == "azure":
             ## OLD AZURE API CODE

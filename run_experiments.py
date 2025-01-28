@@ -4,6 +4,7 @@ from typing import Optional
 import os
 import json
 from tap import Tap
+from tqdm import tqdm
 
 sys.setrecursionlimit(100000)
 
@@ -14,6 +15,8 @@ from joblib import Parallel, delayed
 from utils.language_model import OpenAI_LanguageModel
 from utils.meta_scaffolding import MetaPromptingScaffolding
 
+from evaluate_outputs import extract_answer, \
+        eval_for_pyton_programming_puzzles, eval_for_GameOf24, eval_for_CheckmateInOne, eval_for_exact_matching_with_no_punctuation, eval_for_Sonnet
 
 # Task description dictionary
 DESCRIPTION_DICT = {
@@ -121,7 +124,7 @@ def run_model(
     expert_prompting=False,
 ):
     # Print the type of datum
-    print(f"This is datum: {datum}")
+    #print(f"This is datum: {datum}")
 
     input = datum["input"]
     target = datum["target"]
@@ -181,10 +184,10 @@ def run_model(
 
     output = message_log[-1]["content"]
 
-    # Print the output
-    print(f"Final output: {output}")
-    print(f"Target: {target}")
-    print("\n")
+    ## Print the output
+    #print(f"Final output: {output}")
+    #print(f"Target: {target}")
+    #print("\n")
 
     return {
         "input": input,
@@ -353,10 +356,24 @@ def main(args: Arguments) -> None:
 
     # Set the number of batches (default: 6)
     BATCHES = min(args.max_num, 6)
+    cnt = 0
+    crct = 0
 
+    #import pdb;pdb.set_trace()
+    #outputs = run_model(
+    #    meta_model=meta_model,
+    #    datum=data[0],
+    #    prefix_messages=meta_model_message_list,
+    #    task_description=task_description,
+    #    meta_model_settings=meta_model_settings,
+    #    question_suffix=args.question_suffix_or_path,
+    #    question_prefix=args.question_prefix_or_path,
+    #    expert_prompting=args.expert_prompting,
+    #)
+    #import pdb;pdb.set_trace()
     # Run the model in parallel and append the outputs of run_model to OUTPUTS using joblib
     # Let us do it in batches and save intermediate results to a .jsonl file
-    for i in range(0, min(len(data), args.max_num), BATCHES):
+    for i in tqdm(list(range(0, min(len(data), args.max_num), BATCHES))):
         # Run the model in parallel but have 0.1 second delay between each job
         outputs = Parallel(n_jobs=6, verbose=100, prefer="threads")(
             delayed(run_model)(
@@ -374,6 +391,40 @@ def main(args: Arguments) -> None:
 
         # Append the outputs to OUTPUTS
         OUTPUTS.extend(outputs)
+
+        print(args.task_name)
+        for o in outputs:
+            cnt += 1
+            decision = False
+            if args.task_name == 'P3_Test':
+                output = extract_answer(
+                    txt=o['output'], first_split='>> FINAL ANSWER:\n"""', second_split='"""'
+                )
+                decision = eval_for_pyton_programming_puzzles(o['input'], output, "")
+            elif args.task_name == 'GameOf24':
+                output = extract_answer(o['output'].lower()).strip()
+                decision = eval_for_GameOf24(o['input'], output)
+            elif args.task_name == 'CheckmateInOne':
+                output = extract_answer(o['output'].lower()).strip()
+                target = o['target'].lower()
+                decision = eval_for_CheckmateInOne(o['input'], output, target)
+            elif args.task_name == 'word_sorting':
+                output = extract_answer(o['output'].lower()).strip()
+                target = o['target'].lower()
+                decision = eval_for_exact_matching_with_no_punctuation(o['input'], output, target)
+            elif args.task_name == 'Sonnets-Standard':
+                target = o['target'].lower()
+                target = target.split(',')[1]
+                inp = [t.strip() for t in target.split()]
+                print(inp)
+                output = extract_answer(o['output'].lower()).strip()
+                decision = all(i in output for i in inp)
+                decision = decision and eval_for_Sonnet(output, "ABAB CDCD EFEF GG")
+            else:
+                print('No matching eval')
+            if decision:
+                crct += 1
+        print(f"Accuracy: {crct/cnt}")
 
         # Save the output to a .jsonl file
         with open(args.output_path, "a") as f:
